@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG Shield | Security Scanner</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --accent: #38bdf8;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            width: 95%;
+            max-width: 1200px;
+            height: 85vh;
+            gap: 20px;
+        }
+
+        .panel {
+            background: var(--panel);
+            border-radius: 20px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Left Side: Viewer */
+        .preview-area {
+            flex-grow: 1;
+            border: 2px dashed #334155;
+            border-radius: 12px;
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #0f172a66;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #svg-render {
+            max-width: 90%;
+            max-height: 90%;
+        }
+
+        /* Right Side: Results */
+        h2 {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .back-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .scan-card {
+            background: #0f172a44;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+
+        .status-header {
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-idle {
+            background: #334155;
+            color: var(--text-dim);
+        }
+
+        .status-safe {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .status-warn {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+
+        .audit-list {
+            list-style: none;
+        }
+
+        .audit-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #334155;
+            font-size: 0.9rem;
+        }
+
+        .audit-item span:last-child {
+            font-family: monospace;
+        }
+
+        .found {
+            color: var(--danger);
+            font-weight: bold;
+        }
+
+        .not-found {
+            color: var(--success);
+        }
+
+        .btn-post {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: auto;
+            transition: 0.2s;
+        }
+
+        .btn-post:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        #drop-overlay {
+            position: absolute;
+            pointer-events: none;
+            text-align: center;
+            color: var(--text-dim);
+        }
+
+        /* Flash Messages */
+        .flash-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .flash-message {
+            background-color: var(--panel);
+            color: var(--text);
+            border: 1px solid var(--accent);
+            border-left: 5px solid var(--accent);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-width: 300px;
+            animation: slideIn 0.5s ease-out forwards;
+            backdrop-filter: blur(5px);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="flash-container">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        {% for message in messages %}
+        <div class="flash-message">
+            <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+    </div>
+
+    <main class="container">
+        <section class="panel">
+            <a href="/" class="back-link">← Back to Tools</a>
+            <h2>SVG Preview</h2>
+
+            <div class="preview-area" id="drop-zone">
+                <div id="drop-overlay">
+                    <p>Drag SVG file here or click to upload</p>
+                </div>
+                <div id="svg-render"></div>
+            </div>
+            <input type="file" id="file-input" accept=".svg" hidden>
+        </section>
+
+        <section class="panel">
+            <h2>Security Audit</h2>
+
+            <div id="main-status" class="status-header status-idle">
+                Ready to Scan
+            </div>
+
+            <div class="scan-card">
+                <div class="audit-list">
+                    <div class="audit-item">
+                        <span>Script Tags</span>
+                        <span id="res-scripts">-</span>
+                    </div>
+                    <div class="audit-item">
+                        <span>Event Handlers</span>
+                        <span id="res-events">-</span>
+                    </div>
+                    <div class="audit-item">
+                        <span>Foreign Objects</span>
+                        <span id="res-foreign">-</span>
+                    </div>
+                    <div class="audit-item">
+                        <span>Embedded IFrames</span>
+                        <span id="res-iframes">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <form action="/scan-svg" method="POST" enctype="multipart/form-data" id="scan-form">
+                <input type="hidden" name="tool" value="svg-scan">
+                <input type="file" name="image" id="hidden-file" hidden>
+
+                <button type="submit" id="post-btn" class="btn-post" disabled>
+                    Post to Analysis Server
+                </button>
+            </form>
+        </section>
+    </main>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const hiddenFile = document.getElementById('hidden-file');
+        const svgRender = document.getElementById('svg-render');
+        const dropOverlay = document.getElementById('drop-overlay');
+        const postBtn = document.getElementById('post-btn');
+
+        dropZone.onclick = () => fileInput.click();
+
+        fileInput.onchange = (e) => handleFile(e.target.files[0]);
+
+        function handleFile(file) {
+            if (!file || !file.name.endsWith('.svg')) {
+                alert("Please select a valid SVG file.");
+                return;
+            }
+
+            // Sync with the hidden form input for POSTing
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            hiddenFile.files = dataTransfer.files;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const content = e.target.result;
+
+                // Show raw SVG (sanitized slightly by browser rendering, but we scan the raw text)
+                svgRender.innerHTML = content;
+                dropOverlay.style.display = 'none';
+
+                performScan(content);
+                postBtn.disabled = false;
+            };
+            reader.readAsText(file);
+        }
+
+        function performScan(raw) {
+            const results = {
+                scripts: (raw.match(/<script/gi) || []).length,
+                events: (raw.match(/\son\w+=/gi) || []).length,
+                foreign: (raw.match(/<foreignObject/gi) || []).length,
+                iframes: (raw.match(/<iframe/gi) || []).length
+            };
+
+            // Update UI elements
+            updateRow('res-scripts', results.scripts);
+            updateRow('res-events', results.events);
+            updateRow('res-foreign', results.foreign);
+            updateRow('res-iframes', results.iframes);
+
+            const statusHeader = document.getElementById('main-status');
+            const totalThreats = Object.values(results).reduce((a, b) => a + b, 0);
+
+            if (totalThreats > 0) {
+                statusHeader.innerText = "Threat Detected";
+                statusHeader.className = "status-header status-warn";
+            } else {
+                statusHeader.innerText = "File Clean";
+                statusHeader.className = "status-header status-safe";
+            }
+        }
+
+        function updateRow(id, count) {
+            const el = document.getElementById(id);
+            if (count > 0) {
+                el.innerText = `FOUND (${count})`;
+                el.className = 'found';
+            } else {
+                el.innerText = 'CLEAN';
+                el.className = 'not-found';
+            }
+        }
+
+        // Flash message Auto-Dismiss
+        document.addEventListener('DOMContentLoaded', () => {
+            const messages = document.querySelectorAll('.flash-message');
+            messages.forEach(msg => {
+                setTimeout(() => {
+                    msg.style.animation = 'fadeOut 0.5s ease-in forwards';
+                    msg.addEventListener('animationend', () => msg.remove());
+                }, 4000); // 4 seconds duration
+            });
+        });
+    </script>
+</body>
+
+</html>

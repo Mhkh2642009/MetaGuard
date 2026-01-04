@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaGuard | Image Compressor</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --accent: #38bdf8;
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            width: 95%;
+            max-width: 1200px;
+            height: 85vh;
+            gap: 20px;
+        }
+
+        .panel {
+            background: var(--panel);
+            border-radius: 24px;
+            padding: 35px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+        }
+
+        .back-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        /* Preview Area */
+        .preview-window {
+            flex-grow: 1;
+            border: 2px dashed #334155;
+            border-radius: 16px;
+            background: #0f172a44;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        #preview-img {
+            max-width: 95%;
+            max-height: 95%;
+            border-radius: 8px;
+            display: none;
+        }
+
+        /* Controls Panel */
+        .control-group {
+            background: #0f172a66;
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Quality Slider Styling */
+        input[type=range] {
+            width: 100%;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-box {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            display: block;
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        .btn-action {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            padding: 18px;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-top: auto;
+        }
+
+        .btn-action:disabled {
+            opacity: 0.3;
+            filter: grayscale(1);
+        }
+
+        .btn-action:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(56, 189, 248, 0.2);
+        }
+
+        .placeholder-ui {
+            text-align: center;
+            color: var(--text-dim);
+        }
+
+        /* Flash Messages */
+        .flash-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .flash-message {
+            background-color: var(--panel);
+            color: var(--text);
+            border: 1px solid var(--accent);
+            border-left: 5px solid var(--accent);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-width: 300px;
+            animation: slideIn 0.5s ease-out forwards;
+            backdrop-filter: blur(5px);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="flash-container">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        {% for message in messages %}
+        <div class="flash-message">
+            <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+    </div>
+
+    <main class="container">
+        <section class="panel">
+            <a href="/" class="back-link">← Main Menu</a>
+            <h2 style="margin-bottom: 20px;">Image Optimizer</h2>
+
+            <div class="preview-window" id="drop-zone">
+                <div class="placeholder-ui" id="placeholder">
+                    <span style="font-size: 3rem;">🖼️</span>
+                    <p style="margin-top: 10px;">Click or drag to preview image</p>
+                </div>
+                <img id="preview-img" alt="Compression Preview">
+            </div>
+            <input type="file" id="file-input" accept="image/jpeg, image/png, image/webp" hidden>
+        </section>
+
+        <section class="panel">
+            <h2 style="margin-bottom: 25px; font-size: 1.2rem;">Compression Settings</h2>
+
+            <div class="control-group">
+                <div style="display: flex; justify-content: space-between;">
+                    <label>Quality Level</label>
+                    <span id="quality-val" style="color: var(--accent); font-weight: bold;">80%</span>
+                </div>
+                <input type="range" id="quality-slider" min="5" max="100" value="80">
+                <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 10px;">
+                    Lower quality results in smaller files but more visible "artifacts".
+                </p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <span class="stat-label">Original</span>
+                    <span class="stat-value" id="size-orig">-</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">Estimated</span>
+                    <span class="stat-value" id="size-est" style="color: var(--accent);">-</span>
+                </div>
+            </div>
+
+            <form action="/compress" method="POST" enctype="multipart/form-data" id="compress-form"
+                style="display: contents;">
+                <input type="hidden" name="tool" value="compress">
+                <input type="hidden" name="quality" id="hidden-quality" value="80">
+                <input type="file" name="image" id="hidden-file" hidden>
+
+                <button type="submit" id="submit-btn" class="btn-action" disabled>
+                    Optimize & Upload
+                </button>
+            </form>
+        </section>
+    </main>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const hiddenFile = document.getElementById('hidden-file');
+        const dropZone = document.getElementById('drop-zone');
+        const previewImg = document.getElementById('preview-img');
+        const placeholder = document.getElementById('placeholder');
+        const slider = document.getElementById('quality-slider');
+        const qualityVal = document.getElementById('quality-val');
+        const hiddenQuality = document.getElementById('hidden-quality');
+        const sizeOrig = document.getElementById('size-orig');
+        const sizeEst = document.getElementById('size-est');
+        const submitBtn = document.getElementById('submit-btn');
+
+        let originalFileSize = 0;
+
+        dropZone.onclick = () => fileInput.click();
+
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                // Transfer file to hidden form input
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                hiddenFile.files = dt.files;
+
+                originalFileSize = file.size;
+                sizeOrig.innerText = formatSize(file.size);
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    previewImg.src = event.target.result;
+                    previewImg.style.display = 'block';
+                    placeholder.style.display = 'none';
+                    updateEstimation();
+                    submitBtn.disabled = false;
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        slider.oninput = () => {
+            qualityVal.innerText = slider.value + '%';
+            hiddenQuality.value = slider.value;
+            if (originalFileSize > 0) updateEstimation();
+        };
+
+        function updateEstimation() {
+            // Mock estimation logic: quality ratio * original size
+            // (In a real app, the server handles the actual compression)
+            const ratio = slider.value / 100;
+            const estimated = originalFileSize * (0.2 + (ratio * 0.7));
+            sizeEst.innerText = '~' + formatSize(estimated);
+        }
+
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Flash message Auto-Dismiss
+        document.addEventListener('DOMContentLoaded', () => {
+            const messages = document.querySelectorAll('.flash-message');
+            messages.forEach(msg => {
+                setTimeout(() => {
+                    msg.style.animation = 'fadeOut 0.5s ease-in forwards';
+                    msg.addEventListener('animationend', () => msg.remove());
+                }, 4000); // 4 seconds duration
+            });
+        });
+    </script>
+</body>
+
+</html>

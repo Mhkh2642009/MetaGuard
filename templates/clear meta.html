@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaGuard | Secure Image Processor</title>
+    <script src="https://cdn.jsdelivr.net/npm/exifreader@4.12.0/dist/exif-reader.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --accent-color: #38bdf8;
+            --danger-color: #ef4444;
+            --success-color: #22c55e;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            width: 95%;
+            max-width: 1200px;
+            height: 85vh;
+            gap: 20px;
+        }
+
+        /* Form acts as the main wrapper for the POST request */
+        #upload-form {
+            display: flex;
+            width: 100%;
+            gap: 20px;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border-radius: 16px;
+            padding: 30px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Left Side */
+        header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+            letter-spacing: -1px;
+        }
+
+        header span {
+            color: var(--accent-color);
+        }
+
+        header p {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            margin-bottom: 25px;
+        }
+
+        .drop-zone {
+            flex-grow: 1;
+            border: 2px dashed #334155;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(15, 23, 42, 0.3);
+            position: relative;
+        }
+
+        .drop-zone:hover {
+            border-color: var(--accent-color);
+            background: rgba(56, 189, 248, 0.05);
+        }
+
+        .preview-box {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+        }
+
+        #image-preview {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 8px;
+            object-fit: contain;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        #placeholder-text {
+            text-align: center;
+            color: var(--text-dim);
+        }
+
+        .icon {
+            font-size: 3rem;
+            display: block;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+
+        .primary-btn {
+            margin-top: 20px;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            background: var(--accent-color);
+            color: #0f172a;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .primary-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            filter: grayscale(1);
+        }
+
+        .primary-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(56, 189, 248, 0.4);
+        }
+
+        /* Right Side */
+        .card {
+            background: rgba(51, 65, 85, 0.3);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        h3 {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            color: var(--accent-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            color: var(--text-dim);
+            font-weight: 400;
+            padding: 10px 0;
+            font-size: 0.85rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        td {
+            text-align: right;
+            padding: 10px 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .status-box {
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+
+        .neutral {
+            background: #334155;
+            color: #cbd5e1;
+        }
+
+        .safe {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+            border: 1px solid #22c55e;
+        }
+
+        .infected {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid #ef4444;
+        }
+
+        .check-list {
+            list-style: none;
+            font-size: 0.8rem;
+        }
+
+        .check-list li {
+            padding: 6px 0;
+            display: flex;
+            align-items: center;
+            color: var(--text-dim);
+        }
+
+        .check-list li.found {
+            color: var(--danger-color);
+            font-weight: bold;
+        }
+
+        .check-list li::before {
+            content: "✓";
+            margin-right: 10px;
+            color: var(--success-color);
+        }
+
+        .check-list li.found::before {
+            content: "✕";
+            color: var(--danger-color);
+        }
+
+        /* Loading Animation Overlay */
+        #loader {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.9);
+            z-index: 100;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(56, 189, 248, 0.1);
+            border-left-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Flash Messages */
+        .flash-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .flash-message {
+            background-color: var(--panel-bg);
+            color: var(--text-main);
+            border: 1px solid var(--accent-color);
+            border-left: 5px solid var(--accent-color);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-width: 300px;
+            animation: slideIn 0.5s ease-out forwards;
+            backdrop-filter: blur(5px);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="flash-container">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        {% for message in messages %}
+        <div class="flash-message">
+            <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+    </div>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <p style="margin-top: 15px; color: var(--accent-color);">Uploading & Analysing...</p>
+    </div>
+
+    <main class="app-container">
+        <form action="/delete-meta" method="POST" enctype="multipart/form-data" id="upload-form">
+
+            <section class="panel upload-section">
+                <header>
+                    <h1>Meta<span>Guard</span></h1>
+                    <p>Clean metadata & audit SVG files</p>
+                </header>
+
+                <div class="drop-zone" id="drop-zone">
+                    <div class="preview-box">
+                        <img id="image-preview" src="#" alt="Preview" style="display:none;">
+                        <div id="placeholder-text">
+                            <span class="icon">📁</span>
+                            <p>Click to select or drag image here</p>
+                            <small style="display:block; margin-top:10px; opacity:0.6;">Supports JPG, PNG, WEBP,
+                                SVG</small>
+                        </div>
+                    </div>
+                    <input type="file" id="file-input" name="image" hidden accept="image/*,.svg">
+                </div>
+
+                <button type="submit" id="download-btn" class="primary-btn" disabled>
+                    Clean & Process Image
+                </button>
+            </section>
+
+            <section class="panel info-section">
+                <div class="card">
+                    <h3>Metadata Analysis</h3>
+                    <table id="meta-table">
+                        <tr>
+                            <th>Filename</th>
+                            <td id="data-name">-</td>
+                        </tr>
+                        <tr>
+                            <th>File Size</th>
+                            <td id="data-size">-</td>
+                        </tr>
+                        <tr>
+                            <th>Dimensions</th>
+                            <td id="data-dim">-</td>
+                        </tr>
+                        <tr>
+                            <th>Camera/Artist</th>
+                            <td id="data-artist">-</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="card security-card">
+                    <h3>SVG Security Audit</h3>
+                    <div id="svg-status" class="status-box neutral">
+                        Waiting for upload...
+                    </div>
+                    <ul class="check-list">
+                        <li id="check-scripts">No Script Tags</li>
+                        <li id="check-events">No Event Handlers (XSS)</li>
+                        <li id="check-foreign">No Foreign Objects</li>
+                    </ul>
+                </div>
+
+                <div style="margin-top: auto; font-size: 0.75rem; color: var(--text-dim); text-align: center;">
+                    Privacy Note: Analysis is performed locally before upload.
+                </div>
+            </section>
+
+        </form>
+    </main>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const preview = document.getElementById('image-preview');
+        const placeholder = document.getElementById('placeholder-text');
+        const downloadBtn = document.getElementById('download-btn');
+        const uploadForm = document.getElementById('upload-form');
+        const loader = document.getElementById('loader');
+
+        // Click to open file dialog
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        // Handle Drag and Drop
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = "var(--accent-color)"; });
+        dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = "#334155"; });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileInput.files = e.dataTransfer.files;
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+        async function handleFile(file) {
+            if (!file) return;
+
+            const reader = new FileReader();
+
+            reader.onload = async function (event) {
+                const fileData = event.target.result;
+
+                // 1. Show Preview
+                preview.src = fileData;
+                preview.style.display = 'block';
+                placeholder.style.display = 'none';
+
+                // 2. Basic Info
+                document.getElementById('data-name').innerText = file.name;
+                document.getElementById('data-size').innerText = (file.size / 1024).toFixed(2) + ' KB';
+
+                // 3. Dimensions
+                const img = new Image();
+                img.src = fileData;
+                img.onload = function () {
+                    document.getElementById('data-dim').innerText = `${this.width} × ${this.height} px`;
+                };
+
+                // 4. EXIF Metadata Extraction
+                try {
+                    const tags = await ExifReader.load(fileData);
+                    const artist = tags['Artist']?.description || tags['Author']?.description || 'N/A';
+                    const model = tags['Model']?.description || 'Unknown Device';
+                    document.getElementById('data-artist').innerText = `${artist} (${model})`;
+                } catch (error) {
+                    document.getElementById('data-artist').innerText = 'None Detected';
+                }
+
+                // 5. SVG Security Check
+                if (file.type === "image/svg+xml" || file.name.endsWith('.svg')) {
+                    const textReader = new FileReader();
+                    textReader.onload = (e) => performSVGCheck(e.target.result);
+                    textReader.readAsText(file);
+                } else {
+                    resetSVGPanel();
+                }
+
+                downloadBtn.disabled = false;
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        function performSVGCheck(content) {
+            const statusBox = document.getElementById('svg-status');
+            const scriptLi = document.getElementById('check-scripts');
+            const eventLi = document.getElementById('check-events');
+            const foreignLi = document.getElementById('check-foreign');
+
+            const hasScripts = content.toLowerCase().includes('<script');
+            const hasEvents = /on\w+=/.test(content.toLowerCase());
+            const hasForeign = content.toLowerCase().includes('<foreignobject');
+
+            // Update UI items
+            if (hasScripts) { scriptLi.innerText = "Script Tags Detected!"; scriptLi.classList.add('found'); }
+            if (hasEvents) { eventLi.innerText = "Event Handlers Found!"; eventLi.classList.add('found'); }
+            if (hasForeign) { foreignLi.innerText = "Foreign Objects Found!"; foreignLi.classList.add('found'); }
+
+            if (hasScripts || hasEvents || hasForeign) {
+                statusBox.innerText = "SVG THREAT DETECTED";
+                statusBox.className = "status-box infected";
+            } else {
+                statusBox.innerText = "SVG CLEAN & SAFE";
+                statusBox.className = "status-box safe";
+            }
+        }
+
+        function resetSVGPanel() {
+            document.getElementById('svg-status').innerText = "Not an SVG file";
+            document.getElementById('svg-status').className = "status-box neutral";
+            document.querySelectorAll('.check-list li').forEach(li => li.classList.remove('found'));
+        }
+
+        // Show loader when submitting and handle via Fetch to allow hiding loader
+        uploadForm.onsubmit = async (e) => {
+            e.preventDefault();
+            loader.style.display = "flex";
+
+            const formData = new FormData(uploadForm);
+
+            try {
+                const response = await fetch('/delete-meta', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    // Check if the response is the file download (image)
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.toLowerCase().includes('image')) {
+                        // It is the image, download it
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        // Try to get filename from content-disposition
+                        const disposition = response.headers.get('content-disposition');
+                        let filename = 'clean.jpg';
+                        if (disposition && disposition.indexOf('attachment') !== -1) {
+                            const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                            const matches = filenameRegex.exec(disposition);
+                            if (matches != null && matches[1]) {
+                                filename = matches[1].replace(/['"]/g, '');
+                            }
+                        }
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        window.URL.revokeObjectURL(url);
+
+                        // Show success message manually since we didn't reload
+                        // Or just let the user see the file downloaded
+                    } else {
+                        // It's likely HTML (the redirect page with flash messages)
+                        // Use document.write to render the response including flash messages
+                        // because a reload would lose the flash message consumed by the fetch.
+                        const html = await response.text();
+                        document.open();
+                        document.write(html);
+                        document.close();
+                    }
+                } else {
+                    console.error('Server returned an error');
+                    window.location.reload(); // Reload to show server errors if any
+                }
+            } catch (error) {
+                console.error('Request failed', error);
+                alert('An error occurred while processing the image.');
+            } finally {
+                loader.style.display = "none";
+            }
+        };
+
+        // Flash message Auto-Dismiss
+        document.addEventListener('DOMContentLoaded', () => {
+            const messages = document.querySelectorAll('.flash-message');
+            messages.forEach(msg => {
+                setTimeout(() => {
+                    msg.style.animation = 'fadeOut 0.5s ease-in forwards';
+                    msg.addEventListener('animationend', () => msg.remove());
+                }, 4000); // 4 seconds duration
+            });
+        });
+    </script>
+</body>
+
+</html>
